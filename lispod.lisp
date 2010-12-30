@@ -75,10 +75,9 @@
 
 (defmethod print-bar ((pg progress-bar) stream)
   (with-slots (current total) pg
-    (format stream "[~A>~A] ~5,1f"
-	    (make-string (* 4 (floor (* 100 (/ current total)) 10)) :initial-element #\=)
-	    (make-string (* 4 (- 10 (floor (* 100 (/ current total)) 10))) :initial-element #\Space)
-	    (float (* 100 (/ current total))))))
+    (format stream "~5,1f%: ~A>"
+	    (float (* 100 (/ current total)))
+	    (make-string (* 4 (floor (* 100 (/ current total)) 10)) :initial-element #\=))))
 
 (defgeneric set-value (pg value))
 
@@ -171,6 +170,10 @@
 		 (when (not (null total-size))
 		   (incf downloaded-byte size)
 		   (set-value pgbar downloaded-byte)
+		   (window-clear (get-frame-pane frame 'app))
+		   (format pane "Downloading...~%")
+		   (format pane "URL: ~A~%" url)
+		   (format pane "Save To: ~A~%" file-path)
 		   (format pane "~A~%" (print-bar pgbar nil))
 		   (finish-output))
 		 (write-sequence v out :end size))))))))
@@ -195,7 +198,7 @@
 			  :inherit-from 'string)
 
 (define-presentation-type file-path ()
-			  :inherit-from 'string)
+			  :inherit-from 'pathname)
 
 (define-lispod-main-command (com-add-podcast :name t) ((name 'name-of-podcast) (url 'url))
   (add-podcast (my-podcast *application-frame*) 
@@ -216,26 +219,31 @@
 		       :podcast pd
 		       :num num)))
 
-(define-lispod-main-command (com-download :name t) ((url 'url) (file-name 'file-path))
+(define-lispod-main-command (com-download :name t) ((url 'url) (file-name 'file-path
+									  :default (user-homedir-pathname)
+									  :insert-default t))
   (setf (stream-default-view *standard-output*)
 	(make-instance 'download-view
 		       :url url
 		       :file-path file-name)))
 
-(define-lispod-main-command (com-save-podcast-list :name t) ((file-path 'file-path))
+(define-lispod-main-command (com-save-podcast-list :name t) ((file-path 'file-path
+									:default (user-homedir-pathname)
+									:insert-default t))
     (when (not (null (podcasts (my-podcast *application-frame*))))
 	      (with-open-file (out file-path
 				   :direction :output
 				   :if-exists :overwrite
 				   :if-does-not-exist :create)
-		(format out "~A" (generate-pretty-print-list (my-podcast *application-frame*)))))
-    (frame-exit *application-frame*))
+		(format out "~A" (generate-pretty-print-list (my-podcast *application-frame*))))))
 
 (defmethod equal-data ((pd1 Podcast) (pd2 Podcast))
   (and (string= (name pd1) (name pd2))
        (string= (url pd1) (url pd2))))
 
-(define-lispod-main-command (com-load-podcast-list :name t) ((file-path 'file-path))
+(define-lispod-main-command (com-load-podcast-list :name t) ((file-path 'file-path
+									:default (user-homedir-pathname)
+									:insert-default t))
 			    (let ((rc-file-contents 
 				    (with-open-file (fp file-path
 							:direction :input)
