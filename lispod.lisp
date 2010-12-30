@@ -206,7 +206,7 @@
 			      :name name
 			      :url url)))
 
-(define-lispod-main-command (com-remove-podcast :name t) ((pd 'Podcast))
+(define-lispod-main-command (com-remove-podcast :name t) ((pd 'Podcast :gesture :select))
   (remove-podcast (my-podcast *application-frame*)
 		  pd))
 
@@ -269,6 +269,12 @@
 			    ("Load" :command com-load-podcast-list)
 			    ("Quit" :command com-quit)))
 
+(make-command-table 'lispod-edit-menu
+		    :errorp nil
+		    :menu '(("Add Podcast" :command com-add-podcast)
+			    ("Remove Podcast" :command com-remove-podcast)))
+
 (make-command-table 'menubar-command-table 
 		    :errorp nil
-		    :menu '(("File" :menu lispod-file-menu)))
+		    :menu '(("File" :menu lispod-file-menu)
+			    ("Edit" :menu lispod-edit-menu)))
