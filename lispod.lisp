@@ -27,6 +27,7 @@
   (mapcar #'(lambda (x) 
 	      (multiple-value-bind (matchstring groups)
 		(scan-to-strings "<enclosure.*?url=\"(.*?)\".*?/>" x)
+		(declare (ignore matchstring))
 		(aref groups 0)))
 	  (all-matches-as-strings "<enclosure.*?/>" (http-request (url cast)))))
 
@@ -38,7 +39,7 @@
   ((podcasts :initarg :podcasts :initform nil :accessor podcasts)))
 
 ;;Constructor with rc file
-(defun make-podcast-container (&optional rc-file-path)
+(defun make-podcast-container ()
   (let ((rc-file-contents 
 	  (with-open-file (fp "~/.lispod" 
 			      :direction :input)
@@ -105,7 +106,7 @@
    (%file-path :initarg :file-path :reader file-path)))
 
 (define-application-frame lispod-main ()
-  ((my-podcast :initform (make-podcast-container "~/.lispod")
+  ((my-podcast :initform (make-podcast-container)
 	       :accessor my-podcast))
   (:menu-bar menubar-command-table)
   (:pointer-documentation t)
@@ -193,6 +194,9 @@
 (define-presentation-type url ()
 			  :inherit-from 'string)
 
+(define-presentation-type file-path ()
+			  :inherit-from 'string)
+
 (define-lispod-main-command (com-add-podcast :name t) ((name 'name-of-podcast) (url 'url))
   (add-podcast (my-podcast *application-frame*) 
 	       (make-instance 'Podcast
@@ -211,11 +215,41 @@
 	(make-instance 'podcast-view 
 		       :podcast pd
 		       :num num)))
-(define-lispod-main-command (com-download :name t) ((url 'url) (file-name 'string))
+
+(define-lispod-main-command (com-download :name t) ((url 'url) (file-name 'file-path))
   (setf (stream-default-view *standard-output*)
 	(make-instance 'download-view
 		       :url url
 		       :file-path file-name)))
+
+(define-lispod-main-command (com-save-podcast-list :name t) ((file-path 'file-path))
+    (when (not (null (podcasts (my-podcast *application-frame*))))
+	      (with-open-file (out file-path
+				   :direction :output
+				   :if-exists :overwrite
+				   :if-does-not-exist :create)
+		(format out "~A" (generate-pretty-print-list (my-podcast *application-frame*)))))
+    (frame-exit *application-frame*))
+
+(defmethod equal-data ((pd1 Podcast) (pd2 Podcast))
+  (and (string= (name pd1) (name pd2))
+       (string= (url pd1) (url pd2))))
+
+(define-lispod-main-command (com-load-podcast-list :name t) ((file-path 'file-path))
+			    (let ((rc-file-contents 
+				    (with-open-file (fp file-path
+							:direction :input)
+				      (read fp))))
+			      (setf (podcasts (my-podcast *application-frame*))
+				    (remove-duplicates
+				      (append (mapcar #'(lambda (cast-data) 
+							  (make-instance 'Podcast 
+									 :name (car cast-data) 
+									 :url (cadr cast-data)))
+						      rc-file-contents)
+					      (podcasts (my-podcast *application-frame*)))
+				      :test #'equal-data))))
+
 ;;Generate pretty-print list of podcast
 (defmethod generate-pretty-print-list ((pd Podcast-container))
   (reverse (loop for cast in (podcasts pd)
@@ -223,7 +257,10 @@
 
 (make-command-table 'lispod-file-menu
 		    :errorp nil
-		    :menu '(("Quit" :command com-quit)))
+		    :menu '(("Save" :command com-save-podcast-list)
+			    ("Load" :command com-load-podcast-list)
+			    ("Quit" :command com-quit)))
+
 (make-command-table 'menubar-command-table 
 		    :errorp nil
 		    :menu '(("File" :menu lispod-file-menu)))
