@@ -24,8 +24,11 @@
    (url :initarg :url :initform "" :accessor url)))
 
 (defmethod get-cast-file-url-list ((cast Podcast))
-  (mapcar #'(lambda (x) (html-tag-remover x))
-	  (all-matches-as-strings "<guid>.*?</guid>" (http-request (url cast)))))
+  (mapcar #'(lambda (x) 
+	      (multiple-value-bind (matchstring groups)
+		(scan-to-strings "<enclosure.*?url=\"(.*?)\".*?/>" x)
+		(aref groups 0)))
+	  (all-matches-as-strings "<enclosure.*?/>" (http-request (url cast)))))
 
 (defmethod get-latest-cast ((p Podcast))
   (car (get-cast-file-url-list p)))
@@ -34,6 +37,20 @@
 (defclass Podcast-container ()
   ((podcasts :initarg :podcasts :initform nil :accessor podcasts)))
 
+;;Constructor with rc file
+(defun make-podcast-container (&optional rc-file-path)
+  (let ((rc-file-contents 
+	  (with-open-file (fp "~/.lispod" 
+			      :direction :input)
+	    (read fp)))
+	(new-instance (make-instance 'Podcast-container)))
+    (loop for cast-data in rc-file-contents
+	  do
+	  (add-podcast new-instance
+		       (make-instance 'Podcast
+				      :name (car cast-data)
+				      :url (cadr cast-data))))
+    new-instance))
 (defmethod add-podcast ((pc Podcast-container) (pd Podcast))
   (setf (podcasts pc) (cons pd (podcasts pc))))
 
@@ -88,8 +105,9 @@
    (%file-path :initarg :file-path :reader file-path)))
 
 (define-application-frame lispod-main ()
-  ((my-podcast :initform (make-instance 'Podcast-container)
+  ((my-podcast :initform (make-podcast-container "~/.lispod")
 	       :accessor my-podcast))
+  (:menu-bar menubar-command-table)
   (:pointer-documentation t)
   (:panes
     (app :application :height 400 :width 600
@@ -161,7 +179,13 @@
 
 (define-lispod-main-command (com-quit :name t
 				      :keystroke (#\q :meta)) ()
-  (frame-exit *application-frame*))
+    (when (not (null (podcasts (my-podcast *application-frame*))))
+      (with-open-file (out "~/.lispod"
+			   :direction :output
+			   :if-exists :overwrite
+			   :if-does-not-exist :create)
+	(format out "~A" (generate-pretty-print-list (my-podcast *application-frame*)))))
+    (frame-exit *application-frame*))
 
 (define-presentation-type name-of-podcast ()
 			  :inherit-from 'string)
@@ -192,3 +216,14 @@
 	(make-instance 'download-view
 		       :url url
 		       :file-path file-name)))
+;;Generate pretty-print list of podcast
+(defmethod generate-pretty-print-list ((pd Podcast-container))
+  (reverse (loop for cast in (podcasts pd)
+		 collect (list (write-to-string (name cast)) (write-to-string (url cast))))))
+
+(make-command-table 'lispod-file-menu
+		    :errorp nil
+		    :menu '(("Quit" :command com-quit)))
+(make-command-table 'menubar-command-table 
+		    :errorp nil
+		    :menu '(("File" :menu lispod-file-menu)))
