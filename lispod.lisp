@@ -1,10 +1,20 @@
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (ql:quickload "mcclim")
-  (ql:quickload "drakma")
-  (ql:quickload "cl-ppcre"))
+;;; -* Mode: Lisp; Package: COMMON-LISP-USER -*-
 
-(defpackage :lispod
-  (:use :clim :clim-lisp :drakma :cl-ppcre))
+;;;    Lispod: A simple Podcast manager written in Common Lisp.
+;;;    Copyright (C) 2010 Masato Sogame (poketo7878@yahoo.co.jp)
+;;;
+;;;    This program is free software: you can redistribute it and/or modify
+;;;    it under the terms of the GNU General Public License as published by
+;;;    the Free Software Foundation, either version 3 of the License, or
+;;;    (at your option) any later version.
+;;;
+;;;    This program is distributed in the hope that it will be useful,
+;;;    but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;;    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;;    GNU General Public License for more details.
+;;;
+;;;    You should have received a copy of the GNU General Public License
+;;;    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 (in-package :lispod)
 
@@ -178,18 +188,28 @@
 		   (finish-output))
 		 (write-sequence v out :end size))))))))
 
-(defun app-main ()
-  (run-frame-top-level (make-application-frame 'lispod-main)))
+(defun lispod (&key (new-process nil) (process-name "LisPod"))
+  (let ((app-frame (make-application-frame 'lispod-main)))
+    (flet ((run () (run-frame-top-level app-frame)))
+      (if new-process
+	(clim-sys:make-process #'run :name process-name)
+	(run)))))
 
 (define-lispod-main-command (com-quit :name t
 				      :keystroke (#\q :meta)) ()
     (when (not (null (podcasts (my-podcast *application-frame*))))
       (with-open-file (out "~/.lispod"
 			   :direction :output
-			   :if-exists :overwrite
+			   :if-exists :supersede
 			   :if-does-not-exist :create)
 	(format out "~A" (generate-pretty-print-list (my-podcast *application-frame*)))))
     (frame-exit *application-frame*))
+
+(define-lispod-main-command (com-change-url :name t) ((pd 'Podcast) (url 'url))
+  (setf (url pd) url))
+
+(define-lispod-main-command (com-change-name :name t) ((pd 'Podcast) (name 'name-of-podcast))
+  (setf (name pd) name))
 
 (define-presentation-type name-of-podcast ()
 			  :inherit-from 'string)
@@ -271,7 +291,9 @@
 
 (make-command-table 'lispod-edit-menu
 		    :errorp nil
-		    :menu '(("Add Podcast" :command com-add-podcast)
+		    :menu '(("Change Name" :command com-change-name)
+			    ("Change URL" :command com-change-url)
+			    ("Add Podcast" :command com-add-podcast)
 			    ("Remove Podcast" :command com-remove-podcast)))
 
 (make-command-table 'menubar-command-table 
