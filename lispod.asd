@@ -16,13 +16,14 @@
 ;;;    You should have received a copy of the GNU General Public License
 ;;;    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(defpackage :lispod.system
-  (:use :cl :asdf))
-
-(in-package :lispod.system)
-
-(defsystem :lispod
+(asdf:defsystem :lispod
+  :name "lispod"
+  :version "1.1"
+  :maintainer "Masato Sogame"
+  :author "Masato Sogame <poketo7878@yahoo.co.jp>"
+  :description "Podcast manager"
   :depends-on (:mcclim :drakma :cl-ppcre)
+  :serial t
   :components
   ((:file "package")
-   (:file "lispod" :depends-on ("package"))))
+   (:file "lispod")))

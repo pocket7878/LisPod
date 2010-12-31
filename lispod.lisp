@@ -16,7 +16,7 @@
 ;;;    You should have received a copy of the GNU General Public License
 ;;;    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(in-package :lispod)
+(cl:in-package :lispod)
 
 (defun html-tag-remover (str)
   (regex-replace-all "<.*?>" str ""))
@@ -51,9 +51,10 @@
 ;;Constructor with rc file
 (defun make-podcast-container ()
   (let ((rc-file-contents 
-	  (with-open-file (fp "~/.lispod" 
+	  (with-open-file (fp "~/.lispod"
+			      :if-does-not-exist :create
 			      :direction :input)
-	    (read fp)))
+	    (read fp nil)))
 	(new-instance (make-instance 'Podcast-container)))
     (loop for cast-data in rc-file-contents
 	  do
