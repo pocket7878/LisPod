@@ -268,7 +268,8 @@
 			    (let ((rc-file-contents 
 				    (with-open-file (fp file-path
 							:direction :input)
-				      (read fp))))
+				      (when fp
+					(read fp nil)))))
 			      (setf (podcasts (my-podcast *application-frame*))
 				    (remove-duplicates
 				      (append (mapcar #'(lambda (cast-data) 
